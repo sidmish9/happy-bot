@@ -2,7 +2,6 @@ require('dotenv').config();
 const { Client, IntentsBitField } = require('discord.js');
 const axios = require('axios');
 
-
 const client = new Client({
 
     intents: [
@@ -45,7 +44,6 @@ client.on('messageCreate', async (message) => {
   }
 
   if (state.isActive && message.content.toLowerCase() === 'exit') {
-    // User wants to exit the conversation
     state.isActive = false;
     state.prompt = '';
     message.reply('Goodbye!');
@@ -53,7 +51,6 @@ client.on('messageCreate', async (message) => {
   }
 
   if (state.isActive) {
-    // Continue the conversation
     state.conversation.push(message.content);
     const data = {
       "prompt": state.prompt + state.conversation.join('\n'),
@@ -80,17 +77,13 @@ client.on('messageCreate', async (message) => {
     const mentionRegex = new RegExp(`^<@!?${client.user.id}>`);
     const prompt = message.content.replace(mentionRegex, '').trim();
 
-    // Check if there's an active conversation already
     if (state.isActive) {
       state.conversation.push(prompt);
     } else {
-      // Start a new conversation
       state.prompt = `${process.env.PROMPT}: ${prompt}\n`;
       state.conversation.push(prompt);
 
       state.isActive = true;
-
-      // Send the starter prompt to the API along with the first prompt
         const data = {
           "prompt": state.prompt,
           "temperature": 0.1,
@@ -120,7 +113,5 @@ client.on('messageCreate', async (message) => {
 
   
 });
-
-
 
 client.login(process.env.BOTOKEN);
