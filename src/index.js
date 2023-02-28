@@ -1,6 +1,8 @@
 require('dotenv').config();
-const { Client, IntentsBitField } = require('discord.js');
+const { Client, IntentsBitField, ChannelType } = require('discord.js');
 const axios = require('axios');
+
+
 
 const client = new Client({
 
@@ -43,13 +45,6 @@ client.on('messageCreate', async (message) => {
     conversationState[userId] = state;
   }
 
-  if (state.isActive && message.content.toLowerCase() === 'exit') {
-    state.isActive = false;
-    state.prompt = '';
-    message.reply('Goodbye!');
-    return;
-  }
-
   if (state.isActive) {
     state.conversation.push(message.content);
     const data = {
@@ -73,14 +68,66 @@ client.on('messageCreate', async (message) => {
     } catch (error) {
       console.error(error);
     }
-  }else if (message.mentions.has(client.user)) {
+  }
+
+  
+  else if (message.content.endsWith('.start') && message.mentions.has(client.user)) {
+    try {
+      const channel = message.channel;
+      const threadManager = channel.threads;
+      const options = {
+        name: 'Private thread',
+        type: ChannelType.PrivateThread
+      };
+      const thread = await threadManager.create({
+        autoArchiveDuration: 60,
+        name: `${message.author.username} Conversation`,
+        type: ChannelType.PrivateThread,
+        invitable: false, 
+        reason: 'One-on-one conversation with the bot'
+      });
+  
+      await thread.members.add(message.author.id); 
+      await thread.members.add(client.user.id); 
+  
+      const prompt = 'You are now in a one-on-one conversation with the bot. Type `exit` to end the conversation.\n';
+      thread.send(prompt);
+  
+      state.conversation.push(process.env.PRIVATE_PROMPT);
+  
+      const filter = (response) => response.author.id === message.author.id && response.content.toLowerCase() === 'exit';
+  
+      const collector = thread.createMessageCollector({ filter, time: 15000 });
+      collector.on('collect', async (m) => {
+        await thread.delete();
+        state.isActive = false;
+        const endPrompt = 'Your one-on-one conversation has ended.\n';
+        message.channel.send(endPrompt);
+        state.conversation.push(endPrompt);
+        collector.stop();
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  
+  
+  
+  else if (message.mentions.has(client.user)) {
     const mentionRegex = new RegExp(`^<@!?${client.user.id}>`);
     const prompt = message.content.replace(mentionRegex, '').trim();
+
+    if(prompt == "exit" || prompt == ".exit"){
+      state.isActive = false;
+      state.prompt = '';
+      message.reply("Goodbye!");  
+
+    }
 
     if (state.isActive) {
       state.conversation.push(prompt);
     } else {
-      state.prompt = `${process.env.PROMPT}: ${prompt}\n`;
+      state.prompt = `${process.env.PROMPT} ${prompt}\n`;
       state.conversation.push(prompt);
 
       state.isActive = true;
@@ -110,8 +157,10 @@ client.on('messageCreate', async (message) => {
       
     }
   }
+  
 
   
 });
+
 
 client.login(process.env.BOTOKEN);
